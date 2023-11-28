@@ -1,8 +1,7 @@
-
 from setuptools import setup 
   
 setup( 
-    name='backlog_network', 
+    name='underlay-backlog-estimation', 
     version='0.1', 
     description='A sample Python package', 
     author='John Doe', 
