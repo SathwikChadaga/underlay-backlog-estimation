@@ -8,18 +8,26 @@ class Network:
     num_tunnels,
     num_nodes,
     num_edges,
+    adjacency_nodexedge,
+    is_edge_in_tunnel, 
     underlay_service_rates,
-    external_arrival_rates,
-    tunnel_edge2node_adjacencies
+    external_arrival_rates
   ):
+    def _get_tunnel_adjacencies(adjacency_nodexedge, is_edge_in_tunnel):
+        # create separate adjacency matrices for each tunnels using is_edge_in_tunnel
+        tunnel_adjacencies = np.zeros([self.num_tunnels, self.num_nodes, self.num_edges])
+        for tunnel_ind in range(num_tunnels):
+            tunnel_adjacencies[tunnel_ind, :, :] = adjacency_nodexedge*is_edge_in_tunnel[tunnel_ind,:]
+        return tunnel_adjacencies
+    
     self.num_tunnels = num_tunnels
     self.num_nodes = num_nodes
     self.num_edges = num_edges
     self.underlay_service_rates = underlay_service_rates
     self.external_arrival_rates = external_arrival_rates
-    self.tunnel_edge2node_adjacencies = tunnel_edge2node_adjacencies
+    self.tunnel_adjacencies = _get_tunnel_adjacencies(adjacency_nodexedge, is_edge_in_tunnel)
     self.time = 0
-
+    
   def reset(self):
     self.queue_backlogs = np.zeros([self.num_tunnels, self.num_nodes,])
     self.time = 0
@@ -49,10 +57,10 @@ class Network:
 
       # choose min(current queue size at source of the edge, offered rate of the edge)
       # this code assumes that there is no branching within a tunnel
-      actual_flows = np.min(np.vstack(((self.tunnel_edge2node_adjacencies[tunnel_index,:,:].T < 0)@self.queue_backlogs[tunnel_index,:], all_offered_rates)), axis=0)
+      actual_flows = np.min(np.vstack(((self.tunnel_adjacencies[tunnel_index,:,:].T < 0)@self.queue_backlogs[tunnel_index,:], all_offered_rates)), axis=0)
 
       # apply flows
-      self.queue_backlogs[tunnel_index,:] += self.tunnel_edge2node_adjacencies[tunnel_index,:,:]@actual_flows
+      self.queue_backlogs[tunnel_index,:] += self.tunnel_adjacencies[tunnel_index,:,:]@actual_flows
       self.queue_backlogs[tunnel_index, self.queue_backlogs[tunnel_index,:] < 0] = 0
 
       # the destination queue is a sink
@@ -66,11 +74,10 @@ class Network:
     if(custom_seed != None): np.random.seed(custom_seed)
     queue_backlogs, time = self.reset()
 
-    # get network parameters
+    # get network parameters (for code readability)
     num_nodes = self.num_nodes
     num_edges = self.num_edges
     num_tunnels = self.num_tunnels
-    tunnel_edge2node_adjacencies = self.tunnel_edge2node_adjacencies
 
     # initial variables to save results
     packets_in_flight = np.zeros([total_time, num_tunnels]) # packets in flight in each tunnel
@@ -89,17 +96,19 @@ class Network:
         packets_in_flight[time, :] = np.sum(queue_backlogs_per_tunnel, axis=1)
 
     for tunnel_ind in range(num_tunnels):
-        is_queue_in_tunnel = (np.sum(tunnel_edge2node_adjacencies[tunnel_ind,:,:] == -1, axis=1) == 1)
+        is_queue_in_tunnel = (np.sum(self.tunnel_adjacencies[tunnel_ind,:,:] == -1, axis=1) == 1)
         tunnel_backlogs[:, tunnel_ind] = np.sum(queue_backlogs[:, is_queue_in_tunnel], axis=1)
 
     return packets_in_flight, tunnel_backlogs
   
-  def visualize(self):
+  def visualize(self, custom_seed = None):
+    # visualize the network topology
+    if(custom_seed != None): np.random.seed(custom_seed)
     G = nx.DiGraph()
 
     color_list = ['r', 'b', 'g', 'y', 'm']
     for tunnel_ind in range(self.num_tunnels):
-        adjacency_matrix = self.tunnel_edge2node_adjacencies[tunnel_ind,:,:].T
+        adjacency_matrix = self.tunnel_adjacencies[tunnel_ind,:,:].T
         tunnel_color = color_list[tunnel_ind]
 
         for row in adjacency_matrix:
