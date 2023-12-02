@@ -24,12 +24,16 @@ class DataProcessor:
         y_train, y_test = y_all[:n_train,:], y_all[n_train:,:]
         return x_train, y_train, x_test, y_test
 
-    def scale_train(self, x_train, y_train):
-        self.x_min = torch.min(x_train[:,-1,:], axis=0).values
-        self.x_max = torch.max(x_train[:,-1,:], axis=0).values
+    def scale_train(self, x_train, y_train, is_x_sequenced = False):
+        if(is_x_sequenced):
+            self.x_min = torch.min(x_train[:,-1,:], axis=0).values
+            self.x_max = torch.max(x_train[:,-1,:], axis=0).values
+        else:
+            self.x_min = torch.min(x_train, axis=0).values
+            self.x_max = torch.max(x_train, axis=0).values
         
-        self.y_min = torch.min(y_train[:,:], axis=0).values
-        self.y_max = torch.max(y_train[:,:], axis=0).values
+        self.y_min = torch.min(y_train, axis=0).values
+        self.y_max = torch.max(y_train, axis=0).values
 
         x_train = (x_train - self.x_min)/(self.x_max - self.x_min)
         y_train = (y_train - self.y_min)/(self.y_max - self.y_min)
