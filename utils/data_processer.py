@@ -49,3 +49,28 @@ class DataProcessor:
         x_unscaled = x_scaled*(self.x_max - self.x_min) + self.x_min
         y_unscaled = y_scaled*(self.y_max - self.y_min) + self.y_min
         return x_unscaled, y_unscaled
+
+    def feature_transform(self, device, x):
+        num_tunnels = x.shape[-1]
+
+        x_transformed = torch.zeros([x.shape[0], x.shape[1], 2*num_tunnels + 1]).to(device)
+
+        x_transformed[:,:,:num_tunnels] = x
+
+        # time differences
+        # TODO: use tunnel injection values instead of this difference
+        x_transformed[:,1:,num_tunnels:2*num_tunnels] = x[:,1:,:] - x[:,:-1,:]
+        x_transformed[:,0,num_tunnels:2*num_tunnels] = x[:,0,:]
+
+        # sum of features
+        x_transformed[:,:,-1] = x[:,:,0] + x[:,:,1]
+
+        # difference of features
+        # x_transformed[:,:,-2] = x[:,:,0] + x[:,:,1]
+
+        
+        # x_transformed = torch.zeros([x.shape[0], x.shape[1], num_tunnels]).to(device)
+        # x_transformed[:,1:,:] = x[:,1:,:] - x[:,:-1,:]
+        # x_transformed[:,0,:] = x[:,0,:]
+
+        return x_transformed
