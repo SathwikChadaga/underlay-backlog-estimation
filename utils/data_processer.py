@@ -12,7 +12,7 @@ class DataProcessor:
     def create_sequences(self, packets_in_flight, look_back=1):
         sequence_length = packets_in_flight.shape[0]
         # append zeros in the beginning
-        packets_in_flight = torch.concat((torch.zeros([look_back, packets_in_flight.shape[1]]), packets_in_flight), axis=0)
+        packets_in_flight = torch.concat((torch.zeros([look_back-1, packets_in_flight.shape[1]]), packets_in_flight), axis=0)
         X = []
         for ii in range(sequence_length):
             X.append(packets_in_flight[ii:ii+look_back, :])
