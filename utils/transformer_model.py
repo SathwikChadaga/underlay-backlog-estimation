@@ -3,48 +3,71 @@ import torch.nn as nn
 import math
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_dim, model_dim, output_dim, look_back, num_heads, num_encoder_layers, num_decoder_layers, dropout):
+    def __init__(self, src_dim, tgt_dim, model_dim, output_dim, look_back, num_heads, num_encoder_layers, num_decoder_layers, dropout, device):
         super(TransformerModel, self).__init__()
-        
+
+        self.look_back = look_back
+        self.device = device
         self.model_dim = model_dim
+        self.tgt_dim = tgt_dim
+
+        self.input_layer_src = nn.Linear(src_dim, model_dim) # nn.ModuleList([nn.Linear(src_dim, model_dim), nn.ReLU(), nn.Linear(model_dim, model_dim)])
+        self.input_layer_tgt = nn.Linear(tgt_dim, model_dim) # nn.ModuleList([nn.Linear(tgt_dim, model_dim), nn.ReLU(), nn.Linear(model_dim, model_dim)])
+
         self.positional_encoder = PositionalEncoding(d_model = model_dim, dropout = dropout, max_len = look_back)
-        self.embedding = nn.Embedding(input_dim, model_dim)
+        
         self.transformer = nn.Transformer(
             d_model = model_dim, 
             nhead = num_heads,
             num_encoder_layers = num_encoder_layers,
             num_decoder_layers = num_decoder_layers,
             dropout = dropout)
-        self.input_layer = nn.Linear(input_dim, model_dim)
-        self.out = nn.Linear(model_dim, output_dim)
+        
+        self.output_layer = nn.Linear(model_dim, output_dim)
 
     def forward(self, src, tgt):
-        # Src size must be (batch_size, src sequence length)
-        # Tgt size must be (batch_size, tgt sequence length)
-
-        # Embedding + positional encoding - Out size = (batch_size, sequence length, dim_model)
-        # src = self.embedding(src) * math.sqrt(self.model_dim)
-        # tgt = self.embedding(tgt) * math.sqrt(self.model_dim)
-
-        # we permute to obtain size (sequence length, batch_size, dim_model),
-        src = src.permute(1, 0, 2)
-        tgt = tgt.permute(1, 0, 2)
-
-        src = self.input_layer(src)
-        tgt = self.input_layer(tgt)
+        # src = packets in flight of curreent time step and the previous look_back time steps
+        # expected src dimension = (batch_size, look_back, num_tunnels)
         
+        # tgt = true queue backlogs of the previous look_back time steps
+        # expected tgt dimension = (batch_size, look_back-1, num_tunnels)
+
+        # reshape to fit transformers shape requirements
+        src = src.permute(1,0,2)
+        tgt = tgt.permute(1,0,2)
+
+        # convert to transformers dimension
+        # for layer in self.input_layer_src:
+        #     src = layer(src)
+            
+        # for layer in self.input_layer_tgt:
+        #     tgt = layer(tgt)
+        
+        src = self.input_layer_src(src)
+        tgt = self.input_layer_tgt(tgt)
+        
+        # add poistional encoding
         src = self.positional_encoder(src)
         tgt = self.positional_encoder(tgt)
 
-        # Transformer blocks - Out size = (sequence length, batch_size, num_tokens)
+        # get transformer output
         transformer_out = self.transformer(src, tgt)
-        out = self.out(transformer_out[-1, :])
+        # transformer_out = (transformer_out)
 
+        # if training return all outputs
+        out = self.output_layer(transformer_out)
+        out = out.permute(1,0,2)
+            
         return out
-
-    def evaluate(self, src, tgt):
+        
+    def evaluate(self, src):
         with torch.no_grad():
-            return self.forward(src, tgt)
+            zeros_pads = torch.zeros([src.shape[0], 1, self.tgt_dim]).to(self.device)
+            tgt_in = zeros_pads.clone()
+            for ii in range(self.look_back):
+                tgt_out = self.forward(src, tgt_in)
+                tgt_in = torch.concat((zeros_pads, tgt_out), dim=1)
+        return tgt_out[:,-1,:]
         
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):

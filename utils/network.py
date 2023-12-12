@@ -39,6 +39,7 @@ class Network:
   def step(self, overlay_offered_rates):
 
     # handle each tunnel as though it is a different network
+    tunnel_injections = np.zeros([self.num_tunnels,])
     for tunnel_index in range(self.num_tunnels):
       # self.queue_backlogs[tunnel_index,:]: Individual queue backlogs along tunnel_index (underlay and overlay)
       # external_arrivals: External arrivals 
@@ -48,6 +49,7 @@ class Network:
       # external arrivals
       external_arrivals = np.random.poisson(self.external_arrival_rates[tunnel_index,:], self.num_nodes)
       self.queue_backlogs[tunnel_index,:] += external_arrivals
+      tunnel_injections[tunnel_index] = np.sum(external_arrivals)
 
       # flows along underlay edges
       underlay_offered_rates_tunnel_index = np.random.poisson(self.underlay_service_rates[tunnel_index,:], self.num_edges)
@@ -67,7 +69,7 @@ class Network:
       self.queue_backlogs[tunnel_index, -1] = 0
 
     self.time += 1
-    return self.queue_backlogs, self.time
+    return self.queue_backlogs, self.time, tunnel_injections
   
   def simulate(self, overlay_service_rates, total_time, custom_seed = None):
     # reset network
@@ -83,23 +85,26 @@ class Network:
     packets_in_flight = np.zeros([total_time, num_tunnels]) # packets in flight in each tunnel
     tunnel_backlogs = np.zeros([total_time, num_tunnels]) # total queue backlogs in each tunnel
     queue_backlogs = np.zeros([total_time, num_nodes]) # backlogs in each queue
+    tunnel_injections = np.zeros([total_time, num_tunnels])
 
     # simulate for total_time iterations
     queue_backlogs[time, : ] = np.sum(queue_backlogs, axis=0)
     while(time < total_time-1):
         # get overlay rates and simulate one time step
         overlay_offered_rates = np.random.poisson(overlay_service_rates, [num_tunnels, num_edges, ])
-        queue_backlogs_per_tunnel, time = self.step(overlay_offered_rates)
+        queue_backlogs_per_tunnel, time, current_tunnel_injections = self.step(overlay_offered_rates)
 
         # save relevant information
         queue_backlogs[time, : ] = np.sum(queue_backlogs_per_tunnel, axis=0)
         packets_in_flight[time, :] = np.sum(queue_backlogs_per_tunnel, axis=1)
+        tunnel_injections[time, :] = current_tunnel_injections
 
     for tunnel_ind in range(num_tunnels):
         is_queue_in_tunnel = (np.sum(self.tunnel_adjacencies[tunnel_ind,:,:] == -1, axis=1) == 1)
         tunnel_backlogs[:, tunnel_ind] = np.sum(queue_backlogs[:, is_queue_in_tunnel], axis=1)
 
-    return packets_in_flight, tunnel_backlogs
+    tunnel_exits = np.vstack((np.zeros([1,num_tunnels]), packets_in_flight[:-1,:])) + tunnel_injections - packets_in_flight
+    return packets_in_flight, tunnel_backlogs, tunnel_injections, tunnel_exits
   
   def visualize(self, custom_seed = None):
     # visualize the network topology

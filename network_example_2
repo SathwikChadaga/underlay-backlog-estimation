@@ -1,0 +1,29 @@
+num_nodes = 6
+num_edges = 6
+
+adjacency_nodexedge = np.zeros([num_nodes, num_edges]) # node x edge adjacency matrix of the network (with all tunnels)
+adjacency_nodexedge = np.array([[-1, 0, 0, 0, 0, 0], # -1 => node is edge's source
+                                [ 1,-1, 0,-1, 0, 0], # 1 => node is edge's destination
+                                [ 0, 1,-1, 0, 0, 0],
+                                [ 0, 0, 0, 1,-1, 0],
+                                [ 0, 0, 1, 0, 1,-1],
+                                [ 0, 0, 0, 0, 0, 1]])
+
+num_tunnels = 2
+
+is_edge_in_tunnel      = np.zeros([num_tunnels, num_edges, ])
+external_arrival_rates = np.zeros([num_tunnels, num_nodes, ])
+overlay_service_rates  = np.zeros([num_tunnels, num_edges, ])
+underlay_service_rates = np.zeros([num_tunnels, num_edges, ])
+
+# tunnel 0
+is_edge_in_tunnel[0,:]      = np.array([1,1,1,0,0,1]) # 1 => edge is a part of the tunnel, 0 => otherwise
+external_arrival_rates[0,:] = 2*np.array([0.9,0,0,0,0,0])
+overlay_service_rates[0,:]  = 2*np.array([1,0,0,0,0,0])
+underlay_service_rates[0,:] = 2*np.array([0,1,1,0,0,1])
+
+# tunnel 1
+is_edge_in_tunnel[1,:]      = np.array([1,0,0,1,1,1]) # 1 => edge is a part of the tunnel, 0 => otherwise
+external_arrival_rates[1,:] = 2*np.array([0.9,0,0,0,0,0])
+overlay_service_rates[1,:]  = 2*np.array([1,0,0,0,0,0])
+underlay_service_rates[1,:] = 2*np.array([0,0,0,1,1,1])
