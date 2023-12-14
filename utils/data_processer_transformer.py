@@ -2,12 +2,7 @@ import torch
 import numpy as np
 
 class DataProcessor:
-    def __init__(self):
-        self.x_min = None
-        self.x_max = None
-
-        self.y_min = None
-        self.y_max = None
+    def __init__(self): return
 
     def create_sequences(self, packets_in_flight, look_back=1):
         sequence_length = packets_in_flight.shape[0]
@@ -26,60 +21,55 @@ class DataProcessor:
 
         return src_train, tgt_train, src_test, tgt_test
 
-    def scale_train(self, src_train, tgt_train, is_x_sequenced = False):
-        if(is_x_sequenced):
-            self.x_min = torch.min(src_train[:,-1,:], axis=0).values
-            self.x_max = torch.max(src_train[:,-1,:], axis=0).values
-        else:
-            self.x_min = torch.min(src_train, axis=0).values
-            self.x_max = torch.max(src_train, axis=0).values
+    def scale_train(self, src_train, tgt_train, is_x_sequenced = True):
+        self.src_min = torch.min(src_train[:,-1,:], axis=0).values
+        self.src_max = torch.max(src_train[:,-1,:], axis=0).values
         
-        self.y_min = torch.min(tgt_train[:,-1,:], axis=0).values
-        self.y_max = torch.max(tgt_train[:,-1,:], axis=0).values
+        self.tgt_min = torch.min(tgt_train[:,-1,:], axis=0).values
+        self.tgt_max = torch.max(tgt_train[:,-1,:], axis=0).values
 
-        src_train = (src_train - self.x_min)/(self.x_max - self.x_min)
-        tgt_train = (tgt_train - self.y_min)/(self.y_max - self.y_min)
+        src_train = (src_train - self.src_min)/(self.src_max - self.src_min)
+        tgt_train = (tgt_train - self.tgt_min)/(self.tgt_max - self.tgt_min)
 
         return src_train, tgt_train
 
     def scale_test(self, src_test, tgt_test):
-        src_test = (src_test - self.x_min)/(self.x_max - self.x_min)
-        tgt_test = (tgt_test - self.y_min)/(self.y_max - self.y_min)
+        src_test = (src_test - self.src_min)/(self.src_max - self.src_min)
+        tgt_test = (tgt_test - self.tgt_min)/(self.tgt_max - self.tgt_min)
         return src_test, tgt_test
     
-    def inverse_scale(self, x_scaled, y_scaled):
-        x_unscaled = x_scaled*(self.x_max - self.x_min) + self.x_min
-        y_unscaled = y_scaled*(self.y_max - self.y_min) + self.y_min
-        return x_unscaled, y_unscaled
+    def inverse_scale(self, src_scaled, tgt_scaled):
+        src_unscaled = src_scaled*(self.src_max - self.src_min) + self.src_min
+        tgt_unscaled = tgt_scaled*(self.tgt_max - self.tgt_min) + self.tgt_min
+        return src_unscaled, tgt_unscaled
 
-    def create_tgt_input_outputs(self, tgt):
-        tgt_input = torch.zeros_like(tgt)
+    def create_tgt_input_outputs(self, tgt, initial_fillers):
+        tgt_input = torch.zeros_like(tgt) + initial_fillers
         tgt_input[:,1:,:] = tgt[:,:-1,:]
         tgt_output = tgt
         return tgt_input, tgt_output
     
-    # def feature_transform(self, device, x):
-    #     num_tunnels = x.shape[-1]
+    def feature_transform(self, device, x):
+        num_tunnels = x.shape[-1]
 
-    #     x_transformed = torch.zeros([x.shape[0], x.shape[1], 2*num_tunnels+2]).to(device)
+        x_transformed = torch.zeros([x.shape[0], x.shape[1], 2*num_tunnels + 1]).to(device)
 
-    #     x_transformed[:,:,:num_tunnels] = x
+        x_transformed[:,:,:num_tunnels] = x
 
-    #     # time differences
-    #     # TODO: use tunnel injection values instead of this difference
-    #     x_transformed[:,1:,num_tunnels:2*num_tunnels] = x[:,1:,:] - x[:,:-1,:]
-    #     x_transformed[:,0,num_tunnels:2*num_tunnels] = x[:,0,:]
+        # time differences
+        # TODO: use tunnel injection values instead of this difference
+        x_transformed[:,1:,num_tunnels:2*num_tunnels] = x[:,1:,:] - x[:,:-1,:]
+        x_transformed[:,0,num_tunnels:2*num_tunnels] = x[:,0,:]
 
-    #     # sum of features
-    #     x_transformed[:,:,-2] = torch.sqrt(x[:,:,0]**2 + x[:,:,1]**2)
-    #     x_transformed[:,:,-1] = 2*torch.atan(x[:,:,1]/(x[:,:,0]+1e-5))/torch.pi
+        # sum of features
+        x_transformed[:,:,-1] = x[:,:,0] + x[:,:,1]
 
-    #     # difference of features
-    #     # x_transformed[:,:,-2] = x[:,:,0] + x[:,:,1]
+        # difference of features
+        # x_transformed[:,:,-2] = x[:,:,0] + x[:,:,1]
 
         
-    #     # x_transformed = torch.zeros([x.shape[0], x.shape[1], num_tunnels]).to(device)
-    #     # x_transformed[:,1:,:] = x[:,1:,:] - x[:,:-1,:]
-    #     # x_transformed[:,0,:] = x[:,0,:]
+        # x_transformed = torch.zeros([x.shape[0], x.shape[1], num_tunnels]).to(device)
+        # x_transformed[:,1:,:] = x[:,1:,:] - x[:,:-1,:]
+        # x_transformed[:,0,:] = x[:,0,:]
 
-    #     return x_transformed
+        return x_transformed

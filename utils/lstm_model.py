@@ -35,7 +35,7 @@ class LSTMModel(nn.Module):
         for layer in self.hidden_layers:
             x, _ = layer(x)
         x = (self.output_layer(x[:, -1, :]))
-        # x = nn.ReLU()(self.output_layer(torch.mean(x, axis=-2)))
+        x = (nn.Tanh()(2*x)+1)/2
         return x
 
     def evaluate(self, x):
