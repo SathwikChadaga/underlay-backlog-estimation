@@ -1,3 +1,5 @@
 utils/__pycache__/
 .ipynb_checkpoints/
 *.pyc
+final_network2_saved_lstm_model.pkl final_network2_saved_mars_linreg_model.pkl final_network2_saved_transformer_model.pkl
+*.pkl
